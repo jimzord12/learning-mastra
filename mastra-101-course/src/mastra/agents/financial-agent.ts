@@ -1,11 +1,35 @@
-import { Agent } from '@mastra/core/agent';
-// We'll import our tool in a later step
+import { Agent } from "@mastra/core/agent";
+import { LibSQLStore } from "@mastra/libsql";
+import { MCPClient } from "@mastra/mcp";
+import { Memory } from "@mastra/memory";
+import { getTransactionsTool } from "../tools/get-transactions-tool";
+
+// Set up MCP client to get Wikipedia tools
+const mcp = new MCPClient({
+	servers: {
+		wikipedia: {
+			command: "npx",
+			args: ["-y", "wikipedia-mcp"],
+		},
+	},
+});
+
+// Get MCP tools (Wikipedia search)
+const mcpTools = await mcp.getTools();
 
 export const financialAgent = new Agent({
-  name: 'Financial Assistant Agent',
-  model: 'openai/gpt-5-nano',
-  tools: {}, // We'll add tools in a later step
-  instructions: `**ROLE DEFINITION**
+	name: "Financial Assistant Agent",
+	model: "openai/gpt-4o",
+	tools: {
+		getTransactionsTool, // Custom tool for transaction data
+		...mcpTools, // MCP tools (Wikipedia search)
+	},
+	memory: new Memory({
+		storage: new LibSQLStore({
+			url: "file:../../memory.db", // local file-system database. Location is relative to the output directory `.mastra/output`
+		}),
+	}),
+	instructions: `**ROLE DEFINITION**
 - You are a financial assistant that helps users analyze their transaction data.
 - Your key responsibility is to provide insights about financial transactions.
 - Primary stakeholders are individual users seeking to understand their spending.
@@ -14,6 +38,7 @@ export const financialAgent = new Agent({
 - Analyze transaction data to identify spending patterns.
 - Answer questions about specific transactions or vendors.
 - Provide basic summaries of spending by category or time period.
+- Look up information about companies, financial terms, or concepts using Wikipedia.
 
 **BEHAVIORAL GUIDELINES**
 - Maintain a professional and friendly communication style.
@@ -21,6 +46,7 @@ export const financialAgent = new Agent({
 - Always clarify if you need more information to answer a question.
 - Format currency values appropriately.
 - Ensure user privacy and data security.
+- When asked about companies or financial terms, use Wikipedia to provide context.
 
 **CONSTRAINTS & BOUNDARIES**
 - Do not provide financial investment advice.
